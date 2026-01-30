@@ -1,0 +1,197 @@
+name: Extract Partitions from Firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: 'Firmware ZIP URL'
+        required: true
+        type: string
+      partitions:
+        description: 'Partitions to extract (comma separated, e.g., boot,init_boot,vendor_boot)'
+        required: true
+        default: 'boot,init_boot'
+        type: string
+      patch_kernelsu:
+        description: 'Patch with KernelSU (LKM)'
+        required: true
+        type: boolean
+        default: false
+      magisk_version:
+        description: 'Magisk Version (e.g., 27.0)'
+        required: false
+        default: '27.0'
+        type: string
+      ksu_version:
+        description: 'KernelSU Version (e.g., 0.9.5)'
+        required: false
+        default: '0.9.5'
+        type: string
+      kmi_version:
+        description: 'KMI Version (e.g., android15-6.6)'
+        required: false
+        default: 'android15-6.6'
+        type: string
+      patch_target:
+        description: 'Partition to patch (e.g., init_boot or boot)'
+        required: false
+        default: 'init_boot'
+        type: string
+      upload_to_release:
+        description: 'Upload to Releases'
+        required: true
+        type: boolean
+        default: true
+      upload_to_artifacts:
+        description: 'Upload to Workflow Artifacts'
+        required: true
+        type: boolean
+        default: false
+
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget xz-utils unzip curl
+
+      - name: Download payload-dumper-go
+        run: |
+          wget -q https://github.com/ssut/payload-dumper-go/releases/download/1.3.0/payload-dumper-go_1.3.0_linux_amd64.tar.gz
+          tar -zxf payload-dumper-go_1.3.0_linux_amd64.tar.gz
+          chmod +x payload-dumper-go
+
+      - name: Download Firmware
+        run: |
+          echo "开始下载固件..."
+          curl -L -o firmware.zip "${{ github.event.inputs.firmware_url }}" --progress-bar
+          echo "下载完成!"
+
+      - name: Extract payload_properties.txt and payload.bin
+        run: |
+          unzip -q firmware.zip payload_properties.txt payload.bin -d . || unzip -q firmware.zip payload.bin -d .
+          if [ -f "payload_properties.txt" ]; then
+            DEVICE_MODEL=$(grep "ota_target_version" payload_properties.txt | cut -d'=' -f2)
+            echo "DEVICE_MODEL=$DEVICE_MODEL" >> $GITHUB_ENV
+          fi
+
+      - name: Extract Partitions
+        run: |
+          mkdir -p output
+          ./payload-dumper-go -p "${{ github.event.inputs.partitions }}" -o output payload.bin
+
+      - name: KernelSU LKM Patch
+        if: github.event.inputs.patch_kernelsu == 'true'
+        run: |
+          TARGET_IMG="output/${{ github.event.inputs.patch_target }}.img"
+          if [ -f "$TARGET_IMG" ]; then
+            echo "检测到 $TARGET_IMG，开始进行 KernelSU 补丁..."
+            
+            MAGISK_VER="${{ github.event.inputs.magisk_version }}"
+            KSU_VER="${{ github.event.inputs.ksu_version }}"
+            KMI_VER="${{ github.event.inputs.kmi_version }}"
+            
+            # 1. 下载并准备 magiskboot
+            echo "正在准备 magiskboot (版本: $MAGISK_VER)..."
+            curl -L -o Magisk.zip "https://github.com/topjohnwu/Magisk/releases/download/v${MAGISK_VER}/Magisk-v${MAGISK_VER}.apk"
+            unzip -q Magisk.zip "lib/x86_64/libmagiskboot.so" -d .
+            mv lib/x86_64/libmagiskboot.so magiskboot
+            chmod +x magiskboot
+            
+            # 2. 下载 kernelsu.ko (LKM)
+            echo "正在下载 kernelsu.ko (KMI: $KMI_VER)..."
+            curl -L -o kernelsu.ko "https://github.com/tiann/KernelSU/releases/download/v${KSU_VER}/${KMI_VER}_kernelsu.ko"
+            
+            # 3. 下载并准备 ksud
+            echo "正在准备 ksud (版本: $KSU_VER)..."
+            curl -L -o ksud "https://github.com/tiann/KernelSU/releases/download/v${KSU_VER}/ksud-x86_64-unknown-linux-musl"
+            chmod +x ksud
+            
+            # 4. 执行补丁命令
+            echo "执行补丁命令..."
+            ./ksud boot-patch \
+              --magiskboot ./magiskboot \
+              --kmi "${KMI_VER}" \
+              -b "$TARGET_IMG"
+            
+            # 检查补丁后的文件并重命名
+            if [ -f "kernelsu_boot_patched.img" ]; then
+              mv kernelsu_boot_patched.img "output/${{ github.event.inputs.patch_target }}_ksu_patched.img"
+              echo "补丁成功: output/${{ github.event.inputs.patch_target }}_ksu_patched.img"
+            else
+              # 有些版本的 ksud 可能会直接修改原文件或输出不同名称，这里做个兼容处理
+              PATCHED_FILE=$(ls kernelsu_*.img 2>/dev/null | head -n 1)
+              if [ -n "$PATCHED_FILE" ]; then
+                mv "$PATCHED_FILE" "output/${{ github.event.inputs.patch_target }}_ksu_patched.img"
+                echo "补丁成功: output/${{ github.event.inputs.patch_target }}_ksu_patched.img"
+              else
+                echo "错误: 未找到补丁后的镜像文件。"
+                exit 1
+              fi
+            fi
+          else
+            echo "错误: 未在提取的分区中找到 $TARGET_IMG，无法进行补丁。"
+            exit 1
+          fi
+
+      - name: Prepare Assets
+        run: |
+          cd output
+          echo "最终文件列表:"
+          ls -lh
+
+      - name: Upload to Releases
+        if: github.event.inputs.upload_to_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "extract-${{ github.run_id }}"
+          name: "Extracted Partitions for ${{ env.DEVICE_MODEL || 'Unknown Device' }}"
+          body: |
+            Extracted from: ${{ github.event.inputs.firmware_url }}
+            Partitions: ${{ github.event.inputs.partitions }}
+            KernelSU Patched: ${{ github.event.inputs.patch_kernelsu }}
+            KMI Version: ${{ github.event.inputs.kmi_version }}
+          files: |
+            output/*
+            payload_properties.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
+      - name: Upload to Workflow Artifacts
+        if: github.event.inputs.upload_to_artifacts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: "extracted-partitions-${{ env.DEVICE_MODEL || 'unknown' }}"
+          path: |
+            output/*
+            payload_properties.txt
+          retention-days: 5
+
+      - name: Delete Old Workflow Runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 5
+          keep_minimum_runs: 0
+
+  #    - name: Delete Old Releases
+#        uses: dev-drprasad/delete-older-releases@v0.1.0
+#        with:
+#          keep_latest: 0
+#          delete_older_than: 5
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
