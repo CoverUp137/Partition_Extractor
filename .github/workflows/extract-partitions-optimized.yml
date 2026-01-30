@@ -1,4 +1,4 @@
-name: Extract Partitions from Firmware
+name: extract-partitions-optimized
 
 on:
   workflow_dispatch:
