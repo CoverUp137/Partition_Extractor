@@ -1,0 +1,75 @@
+name: Extract Partitions from Firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: 'Firmware ZIP URL'
+        required: true
+        type: string
+      partitions:
+        description: 'Partitions to extract (comma separated, e.g., boot,init_boot,vendor_boot)'
+        required: true
+        default: 'boot'
+        type: string
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget xz-utils unzip
+
+      - name: Download payload-dumper-go
+        run: |
+          wget https://github.com/ssut/payload-dumper-go/releases/download/1.3.0/payload-dumper-go_1.3.0_linux_amd64.tar.gz
+          tar -zxvf payload-dumper-go_1.3.0_linux_amd64.tar.gz
+          chmod +x payload-dumper-go
+
+      - name: Download Firmware
+        run: |
+          wget -O firmware.zip "${{ github.event.inputs.firmware_url }}"
+
+      - name: Extract payload_properties.txt and payload.bin
+        run: |
+          unzip firmware.zip payload_properties.txt payload.bin -d . || unzip firmware.zip payload.bin -d .
+          if [ -f "payload_properties.txt" ]; then
+            echo "--- Payload Properties ---"
+            cat payload_properties.txt
+            # 尝试提取型号信息用于 Release 标题
+            DEVICE_MODEL=$(grep "ro.product.model" payload_properties.txt | cut -d'=' -f2)
+            echo "DEVICE_MODEL=$DEVICE_MODEL" >> $GITHUB_ENV
+          fi
+
+      - name: Extract Partitions
+        run: |
+          mkdir -p output
+          ./payload-dumper-go -p "${{ github.event.inputs.partitions }}" -o output payload.bin
+
+      - name: Prepare Release Assets
+        run: |
+          cd output
+          # 将提取的分区重命名，增加前缀以防冲突，并打包成 zip（可选，这里直接上传单个文件）
+          ls -R
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "extract-${{ github.run_id }}"
+          name: "Extracted Partitions for ${{ env.DEVICE_MODEL || 'Unknown Device' }}"
+          body: |
+            Extracted from: ${{ github.event.inputs.firmware_url }}
+            Partitions: ${{ github.event.inputs.partitions }}
+          files: |
+            output/*
+            payload_properties.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
