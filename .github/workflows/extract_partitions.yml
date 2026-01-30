@@ -37,14 +37,10 @@ jobs:
       - name: Download Firmware
         run: |
           echo "开始下载固件..."
-          echo "URL: ${{ github.event.inputs.firmware_url }}"
-          
-          # 使用 wget 的静默模式,只显示进度条
-          wget --progress=dot:giga -d 500 -O firmware.zip "${{ github.event.inputs.firmware_url }}"
-          
-          # 显示下载完成的文件信息
+          # 使用 curl 的进度条模式，在 Actions 日志中非常简洁
+          curl -L -o firmware.zip "${{ github.event.inputs.firmware_url }}" --progress-bar
           echo "下载完成!"
-          ls -lh firmware.zip
+
 
       - name: Extract payload_properties.txt and payload.bin
         run: |
