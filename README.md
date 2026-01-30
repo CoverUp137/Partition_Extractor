@@ -15,7 +15,7 @@
 
 1.  **Fork 本项目**：将本项目 Fork 到你自己的 GitHub 账号下。
 2.  **获取固件链接**：准备好你的 Android 固件 ZIP 包的直接下载链接。
-3.  **（可选）配置 Secrets**：本项目使用 `GITHUB_TOKEN` 自动创建 Release，该 Secret 在 GitHub Actions 中默认可用，无需手动配置。
+3.  **（可选）配置 Secrets**：本项目使用 `GITHUB_TOKEN` 自动创建 Release，在 `Settings`--- `secrets and variables` 中设置 `TOKEN` 。
 
 ### 2. 运行工作流
 
