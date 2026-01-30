@@ -86,16 +86,14 @@ jobs:
             payload_properties.txt
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
-
+          
       - name: Delete Old Workflow Runs (All Workflows)
-        uses: Mattraiano/delete-old-workflow-runs@v2
+        uses: AdityaGaurav84/delete-workflow-runs@v2.3.1
         with:
           token: ${{ secrets.TOKEN }}
           repository: ${{ github.repository }}
           retain_days: 5
           keep_minimum_runs: 0
-          delete_workflow_pattern: '.*'
-          delete_workflow_by_state_filter: 'all'
 
       - name: Delete Old Releases
         uses: dev-drprasad/delete-older-releases@v0.3.3
