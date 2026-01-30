@@ -1,4 +1,4 @@
-name: extract-partitions-optimized
+name: extract-partitions-Kernelsu
 
 on:
   workflow_dispatch:
