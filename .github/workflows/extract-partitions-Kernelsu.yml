@@ -18,7 +18,7 @@ on:
         type: boolean
         default: false
       magisk_version:
-        description: 'Magiskboot 版本 (用于提取 magiskboot，例如: 30.6)'
+        description: 'Magisk 版本 (用于提取 magiskboot，例如: 30.6)'
         required: false
         default: '30.6'
         type: string
