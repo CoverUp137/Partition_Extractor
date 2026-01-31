@@ -91,7 +91,6 @@ jobs:
           tag_name: "extract-${{ github.run_id }}"
           name: "Extracted Partitions for ${{ env.DEVICE_MODEL || 'Unknown Device' }}"
           body: |
-           # Extracted from: ${{ github.event.inputs.firmware_url }}
             Partitions: ${{ github.event.inputs.partitions }}
           files: |
             output/*
