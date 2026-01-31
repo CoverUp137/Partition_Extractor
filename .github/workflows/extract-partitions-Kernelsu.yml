@@ -154,7 +154,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "extract-${{ github.run_id }}"
-          name: "Extracted Partitions for ${{ env.DEVICE_MODEL || 'Unknown Device' }}"
+          name: "${{ env.DEVICE_MODEL || 'Unknown Device' }}"
           body: |
             Partitions: ${{ github.event.inputs.partitions }}
             KernelSU Patched: ${{ github.event.inputs.patch_kernelsu }}
@@ -169,7 +169,7 @@ jobs:
         if: github.event.inputs.upload_to_artifacts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: "extracted-partitions-${{ env.DEVICE_MODEL || 'unknown' }}"
+          name: "${{ env.DEVICE_MODEL || 'unknown' }}"
           path: |
             output/*
             payload_properties.txt
