@@ -1,58 +1,39 @@
-# Firmware Partition Extractor GitHub Action
+# Android 固件分区提取与 KernelSU 自动补丁工具
 
-本项目提供了一个 GitHub Action 工作流，用于自动化从 Android 手机固件 ZIP 包中提取指定分区（如 `boot.img`, `vendor_boot.img` 等）文件，并将提取出的文件和固件信息文件 (`payload_properties.txt`) 上传到 GitHub Releases。
+这是一个基于 GitHub Actions 的自动化工具，旨在帮助用户从 Android 固件（payload.bin）中提取指定分区，并可选地使用 KernelSU 进行 LKM 模式的 Root 补丁。
 
-## 核心功能
+## 🛠️ 使用方法
 
-*   **远程固件下载**: 通过 `workflow_dispatch` 手动输入固件 ZIP 包的下载链接。
-*   **自动提取**: 使用高效的 `payload-dumper-go` 工具从 `payload.bin` 中提取指定的分区文件。
-*   **固件信息保留**: 提取并上传固件包中的 `payload_properties.txt` 文件，用于记录固件版本和设备信息。
-*   **自动发布**: 将提取出的分区文件和固件信息文件自动打包并发布到 GitHub Releases。
+1. 设置`GitHub Token` 点击右上角的个人头像---`Settings`-----`Developer Settings`---`Personal access tokens`创建密钥
+2. **Fork 本仓库** 到你的 GitHub 账号下。
+3. `Settings`---`Secrets and variables`---`Repository secrets`---`NewRepository secrets`--变量名为`TOKEN`
+4. 进入仓库的 **Actions** 页面。
+6. 在左侧选择 **"固件分区提取与 KernelSU 补丁"** 工作流。
+7. 点击右侧的 **"Run workflow"**，填写以下参数：
+   - **固件 ZIP 下载地址**：固件的直接下载链接。
+   - **需要提取的分区**：默认为 `boot,init_boot`，可根据需要修改。
+   - **是否使用 KernelSU 进行补丁**：勾选即开启补丁功能。
+   - **Magisk 版本**：用于提取 `magiskboot` 工具（如 `30.6`）。
+   - **KernelSU 版本**：指定 KSU 版本（如 `3.0.0`）。
+   - **KMI 版本**：指定内核版本（如 `android15-6.6`），需与 KSU 官方 Release 的 `.ko` 文件名匹配。
+   - **需要补丁的目标分区**：通常为 `init_boot` 或 `boot`。
+   - **上传选项**：选择上传到 Releases 或 Artifacts。
 
-## 如何使用
+## 📂 文件说明
 
-### 1. 准备工作
+- `.github/workflows/extract-partitions-Kernelsu.yml`: 核心工作流配置文件。
+- `README.md`: 本说明文档。
 
-1.  **Fork 本项目**：将本项目 Fork 到你自己的 GitHub 账号下。
-2.  **获取固件链接**：准备好你的 Android 固件 ZIP 包的直接下载链接。
-3.  **（必须）配置 Secrets**：本项目使用 `GITHUB_TOKEN` 创建 Release，在 `Settings`--- `secrets and variables` 中填入 `TOKEN` 。
+## ⚠️ 注意事项
 
-### 2. 运行工作流
+- **KMI 版本匹配**：KernelSU 补丁非常依赖 KMI 版本的准确性，请务必确认你的内核版本。
+- **存储空间**：GitHub Actions 有存储限制，建议定期手动检查或依赖内置的自动清理功能。
+- **免责声明**：本工具仅供技术交流使用，刷机有风险，操作需谨慎。
 
-1.  进入你的 Fork 后的项目页面。
-2.  点击上方的 **Actions** 标签页。
-3.  在左侧导航栏中，点击 **Extract Partitions from Firmware** 工作流。
-4.  点击 **Run workflow** 按钮。
-5.  在弹出的表单中，填写以下信息：
-    *   **Firmware ZIP URL**: 固件 ZIP 包的直接下载链接。
-    *   **Partitions to extract (comma separated, e.g., boot,init_boot,vendor_boot)**: 
-        *   输入你想要提取的分区名称，多个分区之间用逗号 `,` 分隔。
-        *   例如：`boot,dtbo,vendor_boot`
-        *   **注意**：分区名称必须是 `payload.bin` 中实际包含的名称。如果不确定，可以先尝试运行一次，查看日志中 `payload-dumper-go` 的输出。
+## 🤝 插件支持
 
-6.  点击 **Run workflow** 按钮启动工作流。
-
-### 3. 查看结果
-
-1.  工作流运行完成后，进入项目的 **Releases** 标签页。
-2.  你将看到一个新的 Release，其标题将包含提取的固件版本（如果 `payload_properties.txt` 中包含该信息）。
-3.  Release 附件中将包含你指定提取的所有分区文件（`.img` 文件）以及 `payload_properties.txt` 文件。
-
-## 工作流文件 (`.github/workflows/extract_partitions.yml`)
-
-以下是工作流的详细步骤：
-
-| 步骤名称 | 描述 |
-| :--- | :--- |
-| `Checkout code` | 检出仓库代码。 |
-| `Install dependencies` | 安装 `wget`, `xz-utils`, `unzip` 等依赖。 |
-| `Download payload-dumper-go` | 下载并解压 `payload-dumper-go` 工具。 |
-| `Download Firmware` | 使用 `wget` 下载用户提供的固件 ZIP 包。 |
-| `Extract payload_properties.txt and payload.bin` | 从 ZIP 包中解压出 `payload.bin` 和 `payload_properties.txt`。如果存在 `payload_properties.txt`，则尝试提取设备型号。 |
-| `Extract Partitions` | 使用 `./payload-dumper-go -p <partitions> -o output payload.bin` 命令提取指定分区到 `output` 目录。 |
-| `Prepare Release Assets` | 准备待上传的文件列表。 |
-| `Create Release and Upload Assets` | 使用 `softprops/action-gh-release` Action 创建新的 Release，并将 `output` 目录下的所有文件和 `payload_properties.txt` 作为附件上传。 |
-
-## 许可证
-
-本项目基于 MIT 许可证发布。
+- [payload-dumper-go](https://github.com/ssut/payload-dumper-go)
+- [KernelSU](https://github.com/tiann/KernelSU)
+- [Magisk](https://github.com/topjohnwu/Magisk)
+- [delete-workflow-runs](https://github.com/Mattraks/delete-workflow-runs)
+- [delete-older-releases](https://github.com/dev-drprasad/delete-older-releases)
