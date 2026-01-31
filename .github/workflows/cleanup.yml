@@ -26,12 +26,11 @@ jobs:
           repository: ${{ github.repository }}
           retain_days: 5          
           keep_minimum_runs: 0    
-
-      # 清理旧的 Releases
+          
       - name: Delete Old Releases
-        uses: dev-drprasad/delete-older-releases@v0.1.0
+        uses: easingthemes/delete-old-releases@v0.2.0
         with:
-          keep_latest: 5           
-          delete_older_than: 5     
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+         keep_latest: 5           
+         older_than: 5            
+         env:
+         GITHUB_TOKEN: ${{ secrets.TOKEN }}
