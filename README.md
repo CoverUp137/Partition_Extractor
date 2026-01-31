@@ -15,7 +15,7 @@
    - **是否使用 KernelSU 进行补丁**：勾选即开启补丁功能。
    - **Magisk 版本**：用于提取 `magiskboot` 工具（如 `30.6`），需与 [Magisk](https://github.com/topjohnwu/Magisk/releases) 官方 Release 的 版本一致。
    - **KernelSU 版本**：指定 KSU 版本（如 `3.0.0`）。
-   - **KMI 版本**：指定内核版本（如 `android15-6.6`），需与 KSU 官方 Release 的 `.ko` 文件名匹配。
+   - **KMI 版本**：指定内核版本（如 `android15-6.6`），需与 [KernelSU](https://github.com/tiann/KernelSU/releases) 官方 Release 的 `.ko` 文件名匹配。
    - **需要补丁的目标分区**：通常为 `init_boot` 或 `boot`。
    - **上传选项**：选择上传到 Releases 或 Artifacts。
 
